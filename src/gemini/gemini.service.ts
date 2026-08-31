@@ -1,4 +1,8 @@
 import { Injectable } from '@nestjs/common';
 
 @Injectable()
-export class GeminiService {}
+export class GeminiService {
+  basicPrompt() {
+    return { hola: 'saludos' };
+  }
+}
