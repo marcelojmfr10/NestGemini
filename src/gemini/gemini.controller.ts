@@ -14,19 +14,22 @@ import { BasicPromptDto } from './dtos/basic-prompt.dto';
 import type { Response } from 'express';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ChatPromptDto } from './dtos/chat-prompt.dto';
-import { Stream } from '@google/genai';
+import { Interactions, Stream } from '@google/genai';
 
 @Controller('gemini')
 export class GeminiController {
   constructor(private readonly geminiService: GeminiService) {}
 
-  async outputStreamResponse(res: Response, stream: any) {
+  async outputStreamResponse(
+    res: Response,
+    stream: Stream<Interactions.InteractionSSEEvent>,
+  ) {
     res.setHeader('Content-Type', 'text/plain');
     res.status(HttpStatus.OK);
 
     let resultText = '';
     for await (const event of stream) {
-      if (event.event_type === 'step.delta' && event.delta?.type === 'text') {
+      if (event.event_type === 'step.delta' && event.delta.type === 'text') {
         const piece = event.delta.text;
         resultText += piece;
         res.write(piece);
@@ -65,14 +68,14 @@ export class GeminiController {
     const stream = await this.geminiService.chatStream(chatPromptDto);
     const data = await this.outputStreamResponse(res, stream);
 
-    const geminiMessage = {
-      role: 'model',
-      parts: [{ text: data }],
+    const userMessage: Interactions.UserInputStep = {
+      type: 'user_input',
+      content: [{ type: 'text', text: chatPromptDto.prompt }],
     };
 
-    const userMessage = {
-      role: 'user',
-      parts: [{ text: chatPromptDto.prompt }],
+    const geminiMessage: Interactions.ModelOutputStep = {
+      type: 'model_output',
+      content: [{ type: 'text', text: data }],
     };
 
     this.geminiService.saveMessage(chatPromptDto.chatId, userMessage);
@@ -81,9 +84,12 @@ export class GeminiController {
 
   @Get('chat-history/:chatId')
   getChatHistory(@Param('chatId') chatId: string) {
-    return this.geminiService.getChatHistory(chatId).map((message) => ({
-      role: message.role,
-      parts: message.parts?.map((part) => part.text).join(' '),
+    return this.geminiService.getChatHistory(chatId).map((step) => ({
+      role: step.type === 'user_input' ? 'user' : 'model',
+      parts: (step.content ?? [])
+        .filter((content) => content.type === 'text')
+        .map((content) => content.text)
+        .join(' '),
     }));
   }
 }
