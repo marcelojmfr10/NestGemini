@@ -18,7 +18,7 @@ import { Stream } from '@google/genai';
 export class GeminiController {
   constructor(private readonly geminiService: GeminiService) {}
 
-  async outputStreamResponse(res: Response, stream: Stream<any>) {
+  async outputStreamResponse(res: Response, stream: any) {
     res.setHeader('Content-Type', 'text/plain');
     res.status(HttpStatus.OK);
 
@@ -60,8 +60,20 @@ export class GeminiController {
     @UploadedFiles() files: Array<Express.Multer.File>,
   ) {
     chatPromptDto.files = files;
-    const stream = await this.geminiService.basicPromptStream(chatPromptDto);
-
+    const stream = await this.geminiService.chatStream(chatPromptDto);
     const data = await this.outputStreamResponse(res, stream);
+
+    const geminiMessage = {
+      role: 'model',
+      parts: [{ text: data }],
+    };
+
+    const userMessage = {
+      role: 'user',
+      parts: [{ text: chatPromptDto.prompt }],
+    };
+
+    this.geminiService.saveMessage(chatPromptDto.chatId, userMessage);
+    this.geminiService.saveMessage(chatPromptDto.chatId, geminiMessage);
   }
 }

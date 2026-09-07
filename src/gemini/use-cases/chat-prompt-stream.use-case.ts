@@ -1,10 +1,11 @@
-import { createUserContent, GoogleGenAI } from '@google/genai';
-import { BasicPromptDto } from '../dtos/basic-prompt.dto';
+import { Content, createPartFromUri, GoogleGenAI } from '@google/genai';
 import { ChatPromptDto } from '../dtos/chat-prompt.dto';
+import { geminiUploadFiles } from '../helpers/gemini-upload-file';
 
 interface Options {
   model?: string;
   systemInstruction?: string;
+  history: Content[];
 }
 
 export const chatPromptStreamUseCase = async (
@@ -13,21 +14,29 @@ export const chatPromptStreamUseCase = async (
   options?: Options,
 ) => {
   const { prompt, files = [] } = chatPromptDto;
-
-  const images = await Promise.all(
-    files.map(async (file) => {
-      return await ai.files.upload({
-        file: new Blob([file.buffer], {
-          type: file.mimetype.includes('image') ? file.mimetype : 'image/jpg',
-        }),
-      });
-    }),
-  );
+  const uploadedFiles = await geminiUploadFiles(ai, files);
 
   const {
+    history = [],
     model = 'gemini-3.6-flash',
-    systemInstruction = `Responde únicamente en español, en formato markdown, usa negritas de esta forma __, usa el sistema métrico decimal`,
+    systemInstruction = `Responde únicamente en español, en formato markdown, 
+    usa negritas de esta forma __, usa el sistema métrico decimal`,
   } = options ?? {};
 
-  return '';
+  const chat = ai.chats.create({
+    model,
+    config: {
+      systemInstruction,
+    },
+    history,
+  });
+
+  return chat.sendMessage({
+    message: [
+      prompt,
+      ...uploadedFiles.map((file) =>
+        createPartFromUri(file.uri ?? '', file.mimeType ?? ''),
+      ),
+    ],
+  });
 };
