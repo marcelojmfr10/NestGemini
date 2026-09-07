@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Get,
   HttpStatus,
+  Param,
   Post,
   Res,
   UploadedFiles,
@@ -75,5 +77,13 @@ export class GeminiController {
 
     this.geminiService.saveMessage(chatPromptDto.chatId, userMessage);
     this.geminiService.saveMessage(chatPromptDto.chatId, geminiMessage);
+  }
+
+  @Get('chat-history/:chatId')
+  getChatHistory(@Param('chatId') chatId: string) {
+    return this.geminiService.getChatHistory(chatId).map((message) => ({
+      role: message.role,
+      parts: message.parts?.map((part) => part.text).join(' '),
+    }));
   }
 }
