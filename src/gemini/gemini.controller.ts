@@ -15,6 +15,7 @@ import type { Response } from 'express';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ChatPromptDto } from './dtos/chat-prompt.dto';
 import { Interactions, Stream } from '@google/genai';
+import { ImageGenerationDto } from './dtos/image-generation.dto';
 
 @Controller('gemini')
 export class GeminiController {
@@ -91,5 +92,22 @@ export class GeminiController {
         .map((content) => content.text)
         .join(' '),
     }));
+  }
+
+  @Post('image-generation')
+  @UseInterceptors(FilesInterceptor('files'))
+  async imageGeneration(
+    @Body() imageGenerationDto: ImageGenerationDto,
+    @UploadedFiles() files: Array<Express.Multer.File>,
+  ) {
+    imageGenerationDto.files = files;
+
+    const { imageUrl, text } =
+      await this.geminiService.imageGeneration(imageGenerationDto);
+
+    return {
+      imageUrl,
+      text,
+    };
   }
 }
